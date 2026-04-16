@@ -1,37 +1,32 @@
 // Import dependencies
-import bcrypt from "bcryptjs"; // Password hashing
-import User from "../models/User.js"; // User model
-import generateToken from "../utils/generateToken.js"; // JWT generator
+import bcrypt from "bcryptjs";
+import User from "../models/User.js";
+import generateToken from "../utils/generateToken.js";
+import { success, error } from "../utils/response.js"; // ✅ ADD THIS
 
 // =========================
 // REGISTER USER
 // =========================
 export const register = async (req, res) => {
   try {
-    // Extract data (ADD confirmPassword)
+    // Extract data
     const { name, email, password, confirmPassword } = req.body;
 
     // Basic validation
     if (!name || !email || !password || !confirmPassword) {
-      return res.status(400).json({
-        message: "All fields are required",
-      });
+      return error(res, "All fields are required", 400); // ✅ FIXED
     }
 
-    // ✅ NEW VALIDATION
+    // Confirm password check
     if (password !== confirmPassword) {
-      return res.status(400).json({
-        message: "Passwords do not match",
-      });
+      return error(res, "Passwords do not match", 400); // ✅ FIXED
     }
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
 
     if (userExists) {
-      return res.status(400).json({
-        message: "User already exists",
-      });
+      return error(res, "User already exists", 400); // ✅ FIXED
     }
 
     // Generate salt
@@ -47,20 +42,24 @@ export const register = async (req, res) => {
       password: hashedPassword,
     });
 
-    // Send response (exclude password)
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
+    // Generate token (OPTIONAL but recommended)
+    const token = generateToken(user._id);
+
+    // Send response
+    return success(
+      res,
+      {
+        token, // ✅ added for consistency with login
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+        },
       },
-    });
-  } catch (error) {
-    // Handle server error
-    res.status(500).json({
-      message: error.message,
-    });
+      "User registered successfully",
+    );
+  } catch (err) {
+    return error(res, err.message || "Server Error", 500); // ✅ FIXED
   }
 };
 
@@ -74,46 +73,40 @@ export const login = async (req, res) => {
 
     // Validate input
     if (!email || !password) {
-      return res.status(400).json({
-        message: "Email and password required",
-      });
+      return error(res, "Email and password required", 400); // ✅ FIXED
     }
 
-    // Find user in DB
+    // Find user
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({
-        message: "Invalid credentials",
-      });
+      return error(res, "Invalid credentials", 401); // ✅ FIXED
     }
 
     // Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({
-        message: "Invalid credentials",
-      });
+      return error(res, "Invalid credentials", 401); // ✅ FIXED
     }
 
-    // Generate JWT token
+    // Generate token
     const token = generateToken(user._id);
 
     // Send success response
-    res.status(200).json({
-      message: "Login successful",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
+    return success(
+      res,
+      {
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+        },
       },
-    });
-  } catch (error) {
-    // Handle server error
-    res.status(500).json({
-      message: error.message,
-    });
+      "Login successful",
+    );
+  } catch (err) {
+    return error(res, err.message || "Server Error", 500); // ✅ FIXED
   }
 };

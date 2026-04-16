@@ -1,77 +1,82 @@
-// Import model
 import Asset from "../models/Asset.js";
-
-// Import helpers
 import { success, error } from "../utils/response.js";
 
 // =========================
 // CREATE ASSET
+// POST /api/portfolio
 // =========================
 export const createAsset = async (req, res) => {
   try {
     const { name, type, quantity, buyPrice, currentPrice } = req.body;
 
-    // Validation
+    // Basic validation
     if (!name || !type || !quantity || !buyPrice || !currentPrice) {
       return error(res, "All fields are required", 400);
     }
 
-    // Create asset (attach userId from middleware)
+    // Numeric validation
+    if (quantity <= 0 || buyPrice <= 0 || currentPrice <= 0) {
+      return error(res, "Invalid numeric values", 400);
+    }
+
+    // Create asset
     const asset = await Asset.create({
       name,
       type,
       quantity,
       buyPrice,
       currentPrice,
-      userId: req.user._id,
+      user: req.user._id, // from auth middleware
     });
 
     return success(res, asset, "Asset created successfully");
   } catch (err) {
-    return error(res, err.message);
+    return error(res, err.message || "Server Error", 500);
   }
 };
 
 // =========================
-// GET ASSETS (PAGINATION + FILTER)
+// GET ALL ASSETS (WITH PAGINATION + FILTER)
+// GET /api/portfolio?page=1&limit=10&type=stock
 // =========================
 export const getAssets = async (req, res) => {
   try {
-    const userId = req.user._id;
-
-    // Pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const type = req.query.type;
 
-    // Filter
-    const filter = { userId };
+    const query = { user: req.user._id };
 
-    if (req.query.type) {
-      filter.type = req.query.type;
+    // Optional filtering
+    if (type) {
+      query.type = type;
     }
 
-    // Fetch data
-    const assets = await Asset.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const total = await Asset.countDocuments(query);
 
-    const total = await Asset.countDocuments(filter);
+    const assets = await Asset.find(query)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .sort({ createdAt: -1 });
 
-    return success(res, {
-      items: assets,
-      total,
-      page,
-      limit,
-    });
+    return success(
+      res,
+      {
+        items: assets,
+        page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+      },
+      "Assets fetched successfully",
+    );
   } catch (err) {
-    return error(res, err.message);
+    return error(res, err.message || "Server Error", 500);
   }
 };
 
 // =========================
 // UPDATE ASSET
+// PUT /api/portfolio/:id
 // =========================
 export const updateAsset = async (req, res) => {
   try {
@@ -85,27 +90,44 @@ export const updateAsset = async (req, res) => {
     }
 
     // Ownership check
-    if (asset.userId.toString() !== req.user._id.toString()) {
+    if (asset.user.toString() !== req.user._id.toString()) {
       return error(res, "Not authorized", 403);
     }
 
-    // Update fields
-    const updated = await Asset.findByIdAndUpdate(id, req.body, { new: true });
+    const { name, type, quantity, buyPrice, currentPrice } = req.body;
 
-    return success(res, updated, "Asset updated successfully");
+    // Validation
+    if (!name || !type || !quantity || !buyPrice || !currentPrice) {
+      return error(res, "All fields are required", 400);
+    }
+
+    if (quantity <= 0 || buyPrice <= 0 || currentPrice <= 0) {
+      return error(res, "Invalid numeric values", 400);
+    }
+
+    // Safe update (whitelisted fields only)
+    asset.name = name;
+    asset.type = type;
+    asset.quantity = quantity;
+    asset.buyPrice = buyPrice;
+    asset.currentPrice = currentPrice;
+
+    const updatedAsset = await asset.save();
+
+    return success(res, updatedAsset, "Asset updated successfully");
   } catch (err) {
-    return error(res, err.message);
+    return error(res, err.message || "Server Error", 500);
   }
 };
 
 // =========================
 // DELETE ASSET
+// DELETE /api/portfolio/:id
 // =========================
 export const deleteAsset = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Find asset
     const asset = await Asset.findById(id);
 
     if (!asset) {
@@ -113,15 +135,14 @@ export const deleteAsset = async (req, res) => {
     }
 
     // Ownership check
-    if (asset.userId.toString() !== req.user._id.toString()) {
+    if (asset.user.toString() !== req.user._id.toString()) {
       return error(res, "Not authorized", 403);
     }
 
-    // Delete
     await asset.deleteOne();
 
     return success(res, null, "Asset deleted successfully");
   } catch (err) {
-    return error(res, err.message);
+    return error(res, err.message || "Server Error", 500);
   }
 };
