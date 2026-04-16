@@ -1,20 +1,22 @@
+// Import model
 import Asset from "../models/Asset.js";
 
-// @route GET /api/assets
-export const getAssets = async (req, res) => {
-  try {
-    const assets = await Asset.find({ userId: req.user._id });
-    res.json(assets);
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
+// Import helpers
+import { success, error } from "../utils/response.js";
 
-// @route POST /api/assets
+// =========================
+// CREATE ASSET
+// =========================
 export const createAsset = async (req, res) => {
   try {
     const { name, type, quantity, buyPrice, currentPrice } = req.body;
 
+    // Validation
+    if (!name || !type || !quantity || !buyPrice || !currentPrice) {
+      return error(res, "All fields are required", 400);
+    }
+
+    // Create asset (attach userId from middleware)
     const asset = await Asset.create({
       name,
       type,
@@ -24,52 +26,102 @@ export const createAsset = async (req, res) => {
       userId: req.user._id,
     });
 
-    res.status(201).json(asset);
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    return success(res, asset, "Asset created successfully");
+  } catch (err) {
+    return error(res, err.message);
   }
 };
 
-// @route PUT /api/assets/:id
+// =========================
+// GET ASSETS (PAGINATION + FILTER)
+// =========================
+export const getAssets = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Filter
+    const filter = { userId };
+
+    if (req.query.type) {
+      filter.type = req.query.type;
+    }
+
+    // Fetch data
+    const assets = await Asset.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Asset.countDocuments(filter);
+
+    return success(res, {
+      items: assets,
+      total,
+      page,
+      limit,
+    });
+  } catch (err) {
+    return error(res, err.message);
+  }
+};
+
+// =========================
+// UPDATE ASSET
+// =========================
 export const updateAsset = async (req, res) => {
   try {
-    const asset = await Asset.findById(req.params.id);
+    const { id } = req.params;
+
+    // Find asset
+    const asset = await Asset.findById(id);
 
     if (!asset) {
-      return res.status(404).json({ message: "Asset not found" });
+      return error(res, "Asset not found", 404);
     }
 
+    // Ownership check
     if (asset.userId.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: "Not authorized" });
+      return error(res, "Not authorized", 403);
     }
 
-    const updated = await Asset.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+    // Update fields
+    const updated = await Asset.findByIdAndUpdate(id, req.body, { new: true });
 
-    res.json(updated);
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    return success(res, updated, "Asset updated successfully");
+  } catch (err) {
+    return error(res, err.message);
   }
 };
 
-// @route DELETE /api/assets/:id
+// =========================
+// DELETE ASSET
+// =========================
 export const deleteAsset = async (req, res) => {
   try {
-    const asset = await Asset.findById(req.params.id);
+    const { id } = req.params;
+
+    // Find asset
+    const asset = await Asset.findById(id);
 
     if (!asset) {
-      return res.status(404).json({ message: "Asset not found" });
+      return error(res, "Asset not found", 404);
     }
 
+    // Ownership check
     if (asset.userId.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: "Not authorized" });
+      return error(res, "Not authorized", 403);
     }
 
+    // Delete
     await asset.deleteOne();
 
-    res.json({ message: "Asset removed" });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    return success(res, null, "Asset deleted successfully");
+  } catch (err) {
+    return error(res, err.message);
   }
 };

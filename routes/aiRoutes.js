@@ -1,12 +1,21 @@
+// Import express
 import express from "express";
-import protect from "../middleware/authMiddleware.js";
-import { getInsights, explain } from "../controllers/aiController.js";
 
+// Import controller
+import { getPortfolioInsights } from "../controllers/aiController.js";
+
+// Import auth middleware
+import { protect } from "../middleware/authMiddleware.js";
+
+// Initialize router
 const router = express.Router();
 
-router.use(protect);
+// =========================
+// PROTECTED AI ROUTE
+// =========================
 
-router.post("/insights", getInsights);
-router.post("/explain", explain);
+// Generate portfolio insights
+router.post("/insights", protect, getPortfolioInsights);
 
+// Export router
 export default router;

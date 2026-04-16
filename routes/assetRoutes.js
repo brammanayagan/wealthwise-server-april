@@ -1,18 +1,35 @@
+// Import express
 import express from "express";
-import protect from "../middleware/authMiddleware.js";
+
+// Import controller functions
 import {
-  getAssets,
   createAsset,
+  getAssets,
   updateAsset,
   deleteAsset,
 } from "../controllers/assetController.js";
 
+// Import auth middleware
+import { protect } from "../middleware/authMiddleware.js";
+
+// Initialize router
 const router = express.Router();
 
-router.use(protect);
+// =========================
+// PROTECTED ROUTES
+// =========================
 
-router.route("/").get(getAssets).post(createAsset);
+// Create asset
+router.post("/", protect, createAsset);
 
-router.route("/:id").put(updateAsset).delete(deleteAsset);
+// Get all assets (with pagination + filter)
+router.get("/", protect, getAssets);
 
+// Update asset
+router.put("/:id", protect, updateAsset);
+
+// Delete asset
+router.delete("/:id", protect, deleteAsset);
+
+// Export router
 export default router;

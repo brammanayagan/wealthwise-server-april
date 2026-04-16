@@ -1,28 +1,29 @@
-import Asset from "../models/Asset.js";
-import { generateInsights, explainAsset } from "../services/aiService.js";
+// Import service
+import { generatePortfolioInsight } from "../services/aiService.js";
 
-// @route POST /api/ai/insights
-export const getInsights = async (req, res) => {
+// Import response helpers
+import { success, error } from "../utils/response.js";
+
+// =========================
+// GET AI INSIGHTS
+// =========================
+export const getPortfolioInsights = async (req, res) => {
   try {
-    const assets = await Asset.find({ userId: req.user._id });
+    // Extract assets from request body
+    const { assets } = req.body;
 
-    const insights = await generateInsights(assets);
+    // Validation
+    if (!assets || !Array.isArray(assets)) {
+      return error(res, "Valid assets array is required", 400);
+    }
 
-    res.json({ insights });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
+    // Call AI service
+    const insight = await generatePortfolioInsight(assets);
 
-// @route POST /api/ai/explain
-export const explain = async (req, res) => {
-  try {
-    const { asset } = req.body;
-
-    const explanation = await explainAsset(asset);
-
-    res.json({ explanation });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    // Send response
+    return success(res, { insight }, "Insight generated");
+  } catch (err) {
+    // Fail-safe response (do NOT break API)
+    return error(res, "Failed to generate insight");
   }
 };

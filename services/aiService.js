@@ -1,65 +1,66 @@
-const getFallbackInsights = () => {
-  return "AI not configured. Basic advice: Diversify your portfolio, avoid over-concentration, and review performance regularly.";
-};
+// Import OpenAI SDK
+import OpenAI from "openai";
 
-export const generateInsights = async (assets) => {
+// Initialize client
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// =========================
+// GENERATE PORTFOLIO INSIGHT
+// =========================
+export const generatePortfolioInsight = async (assets = []) => {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return getFallbackInsights();
+    // Basic validation
+    if (!assets || assets.length === 0) {
+      return "No assets available to analyze.";
     }
 
-    const prompt = `
-    Analyze this portfolio and give simple insights:
-    ${JSON.stringify(assets)}
-    `;
+    // Clean & limit data (avoid sending unnecessary data)
+    const cleanAssets = assets.map((a) => ({
+      name: a.name,
+      type: a.type,
+      quantity: a.quantity,
+      buyPrice: a.buyPrice,
+      currentPrice: a.currentPrice,
+    }));
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-      }),
+    // Prompt (controlled + simple)
+    const prompt = `
+You are a financial assistant.
+
+Analyze the following portfolio and respond in EXACT format:
+
+Risk: <Low/Medium/High>
+Suggestion: <One short actionable suggestion>
+
+Portfolio:
+${JSON.stringify(cleanAssets)}
+`;
+
+    // Call OpenAI
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      max_tokens: 150,
+      temperature: 0.5,
     });
 
-    const data = await response.json();
+    // Extract AI response safely
+    const insight =
+      response?.choices?.[0]?.message?.content ||
+      "Unable to generate insight at the moment.";
 
-    return data.choices?.[0]?.message?.content || getFallbackInsights();
+    return insight;
   } catch (error) {
-    return getFallbackInsights();
-  }
-};
+    console.error("OpenAI error:", error.message);
 
-export const explainAsset = async (asset) => {
-  try {
-    if (!process.env.OPENAI_API_KEY) {
-      return "AI not configured. This asset represents an investment holding.";
-    }
-
-    const prompt = `
-    Explain this asset in simple terms:
-    ${JSON.stringify(asset)}
-    `;
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await response.json();
-
-    return data.choices?.[0]?.message?.content || "No explanation available";
-  } catch (error) {
-    return "AI failed. Try again later.";
+    // Fail-safe fallback (important)
+    return "Insight unavailable. Please try again later.";
   }
 };
