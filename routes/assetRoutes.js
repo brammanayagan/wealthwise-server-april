@@ -5,6 +5,7 @@ import express from "express";
 import {
   createAsset,
   getAssets,
+  getAssetById,
   updateAsset,
   deleteAsset,
 } from "../controllers/assetController.js";
@@ -24,6 +25,9 @@ router.post("/", protect, createAsset);
 
 // Get all assets (with pagination + filter)
 router.get("/", protect, getAssets);
+
+// Get single asset by ID
+router.get("/:id", protect, getAssetById);
 
 // Update asset
 router.put("/:id", protect, updateAsset);

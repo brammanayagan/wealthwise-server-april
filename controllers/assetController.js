@@ -75,6 +75,30 @@ export const getAssets = async (req, res) => {
 };
 
 // =========================
+// GET SINGLE ASSET
+// GET /api/portfolio/:id
+// =========================
+export const getAssetById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const asset = await Asset.findById(id);
+
+    if (!asset) {
+      return error(res, "Asset not found", 404);
+    }
+
+    // Ownership check
+    if (asset.user.toString() !== req.user._id.toString()) {
+      return error(res, "Not authorized", 403);
+    }
+
+    return success(res, asset, "Asset fetched successfully");
+  } catch (err) {
+    return error(res, err.message || "Server Error", 500);
+  }
+};
+
+// =========================
 // UPDATE ASSET
 // PUT /api/portfolio/:id
 // =========================

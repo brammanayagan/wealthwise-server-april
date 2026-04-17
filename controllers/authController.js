@@ -10,16 +10,11 @@ import { success, error } from "../utils/response.js"; // ✅ ADD THIS
 export const register = async (req, res) => {
   try {
     // Extract data
-    const { name, email, password, confirmPassword } = req.body;
+    const { name, email, password } = req.body;
 
     // Basic validation
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !email || !password) {
       return error(res, "All fields are required", 400); // ✅ FIXED
-    }
-
-    // Confirm password check
-    if (password !== confirmPassword) {
-      return error(res, "Passwords do not match", 400); // ✅ FIXED
     }
 
     // Check if user already exists
